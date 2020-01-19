@@ -17,25 +17,31 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 
 import java.awt.*;
+import java.util.*;
+import java.util.List;
+import java.util.function.Consumer;
 
 public class Ball {
-    private static final int SPEED = 200;
+    private static final int SPEED = 300;
     private static final int SIZE = 5;
     private static final Paint BALL_COLOR = Color.GRAY;
     private double ballDirectionX = 1;
     private double ballDirectionY = 1;
     private double ballAngle;
+    private boolean inPlay = true;
+    private int mytimeOffset;
     public Circle myBall;
 
-    public Ball (double direction, double angle, double X, double Y) {
+    public Ball (int timeOffset, double angle, double X, double Y) {
         ballAngle = angle;
+        mytimeOffset = timeOffset;
         myBall = new Circle(X, Y, SIZE, BALL_COLOR);
     }
 
     // Set the position of the ball on the screen
     public void setBallPosition (double elapsedTime) {
-        myBall.setCenterX(myBall.getCenterX() + ballDirectionX * SPEED * elapsedTime * Math.cos(ballAngle));
-        myBall.setCenterY(myBall.getCenterY() + ballDirectionY * SPEED * elapsedTime * Math.sin(ballAngle));
+        myBall.setCenterX(myBall.getCenterX() + ballDirectionX * SPEED * (elapsedTime) * Math.cos(ballAngle));
+        myBall.setCenterY(myBall.getCenterY() + ballDirectionY * SPEED * (elapsedTime) * Math.sin(ballAngle));
     }
 
     public void setBallPosition (double X, double Y) {
@@ -47,6 +53,10 @@ public class Ball {
         ballDirectionX = directionX;
         ballDirectionY = directionY;
         ballAngle = angle;
+    }
+
+    public Circle getBall () {
+        return myBall;
     }
 
     public double getBallDirectionX () {
@@ -72,9 +82,11 @@ public class Ball {
         return ballAngle;
     }
 
-    private int getBounceAngle(int angle, int direction){
+    public boolean isInPlay() {
+        return inPlay;
+    }
 
-
-        return 0;
+    public void setInPlay(boolean bool) {
+        inPlay = bool;
     }
 }

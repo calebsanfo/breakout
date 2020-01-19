@@ -13,46 +13,43 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
-import javafx.scene.shape.Circle;
-import javafx.scene.shape.Line;
-import javafx.scene.shape.Rectangle;
-import javafx.scene.shape.Shape;
+import javafx.scene.shape.*;
+import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
+import java.sql.Time;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 public class Main extends Application {
     public static final String TITLE = "Example JavaFX";
     public static final int WINDOW_WIDTH = 400;
     public static final int WINDOW_HEIGHT = 600;
+    public static final int STATUS_HEIGHT = 35;
     public static final int FRAMES_PER_SECOND = 60;
     public static final int MILLISECOND_DELAY = 1000 / FRAMES_PER_SECOND;
     public static final double SECOND_DELAY = 1.0 / FRAMES_PER_SECOND;
     public static final Paint BACKGROUND = Color.AZURE;
-    public static final Paint HIGHLIGHT = Color.OLIVEDRAB;
-    public static final String BOUNCER_IMAGE = "ball.gif";
-    public static final int BOUNCER_SPEED = 30;
-    public static final Paint MOVER_COLOR = Color.PLUM;
-    public static final int MOVER_SIZE = 50;
+    public static final Paint STATUS_BACKGROUND = Color.LIGHTBLUE;
     public static final int MOVER_SPEED = 15;
-    public static final Paint GROWER_COLOR = Color.BISQUE;
-    public static final double GROWER_RATE = 1.1;
-    public static final int GROWER_SIZE = 50;
-    public static final int NUMBER_OF_BALLS = 100;
+    public static final int NUMBER_OF_BALLS = 1;
+    public static final int NUMBER_OF_BRICKS = 6;
+    public static final int BALL_DELAY_MILLIS = 150;
+    public static final int INITIAL_LIVES = 3;
 
     // some things needed to remember during game
     private Scene myScene;
-    private ImageView myBouncer;
     private ImageView paddle;
-    private Circle newBouncer;
-    private Rectangle myMover;
-    private Rectangle myGrower;
-    private int dir = 1;
-    private Ball ball1;
     private Line ballPointer;
     private boolean start = false;
+    private Ball[] myBalls = new Ball[NUMBER_OF_BALLS];
+    private Brick[] myBricks= new Brick[NUMBER_OF_BRICKS];
+    private long startTime;
+    private int numberOfBallsInPlay;
+    private int level;
 
+    private String gameStage = "SPLASH";
 
     /**
      * Initialize what will be displayed and how it will be updated.
@@ -77,55 +74,79 @@ public class Main extends Application {
         // create one top level collection to organize the things in the scene
         Group root = new Group();
         // make some shapes and set their properties
-        System.out.println( "Path: " + getClass().getResource("/").toExternalForm());
-        Image image = new Image(this.getClass().getClassLoader().getResourceAsStream(BOUNCER_IMAGE));
-        myBouncer = new ImageView(image);
+
         Image paddleImage = new Image(this.getClass().getClassLoader().getResourceAsStream(("paddle.gif")));
         paddle = new ImageView(paddleImage);
 
-        //newBouncer = new Circle(width/2, height/2, 5, Color.GREY);
-        // x and y represent the top left corner, so center it in window
-        myBouncer.setX(width / 2 - myBouncer.getBoundsInLocal().getWidth() / 2);
-        myBouncer.setY(height / 2 - myBouncer.getBoundsInLocal().getHeight() / 2);
         paddle.setX(width / 2);
-        paddle.setY(height - 20);
-        ball1 =  new Ball(1,0,paddle.getBoundsInLocal().getCenterX(),paddle.getBoundsInLocal().getCenterY()-(paddle.getBoundsInLocal().getHeight())-5);
-        myMover = new Rectangle(width / 2 - MOVER_SIZE / 2, height / 2 - 100, MOVER_SIZE, MOVER_SIZE);
-        myMover.setFill(MOVER_COLOR);
-        myGrower = new Rectangle(width / 2 - GROWER_SIZE / 2, height / 2 + 50, GROWER_SIZE, GROWER_SIZE);
-        myGrower.setFill(GROWER_COLOR);
-        ballPointer = new Line(paddle.getBoundsInLocal().getCenterX(), paddle.getBoundsInLocal().getCenterY()-paddle.getBoundsInLocal().getHeight()-ball1.myBall.getRadius(), 100, 100);
+        paddle.setY(height - 30);
+
+        for (int i = 0; i<NUMBER_OF_BRICKS; i++ ) {
+            myBricks[i] = new Brick(root, 50*i, 100, 50, 10, "NORMAL");
+        }
+
+        Status myStatus = new Status(root, INITIAL_LIVES, STATUS_HEIGHT, WINDOW_WIDTH, STATUS_BACKGROUND);
+
+        for (int i = 0; i<NUMBER_OF_BALLS; i++ ) {
+            myBalls[i] = (new Ball(i*2, 0, paddle.getBoundsInLocal().getCenterX(),paddle.getBoundsInLocal().getCenterY()-(paddle.getBoundsInLocal().getHeight())-5));
+            root.getChildren().add(myBalls[i].getBall());
+        }
+
+        ballPointer = new Line(paddle.getBoundsInLocal().getCenterX(), paddle.getBoundsInLocal().getCenterY()-paddle.getBoundsInLocal().getHeight()-myBalls[0].getBall().getRadius(), 100, 100);
         ballPointer.setVisible(false);
-        System.out.println(paddle.getBoundsInLocal().getCenterX());
-        // order added to the group is the order in which they are drawn
-        root.getChildren().add(myBouncer);
-        root.getChildren().add(ball1.myBall);
-//        root.getChildren().add(newBouncer);
-        root.getChildren().add(myMover);
-        root.getChildren().add(myGrower);
+
         root.getChildren().add(paddle);
         root.getChildren().add(ballPointer);
+
         // create a place to see the shapes
         Scene scene = new Scene(root, width, height, background);
         // respond to input
         scene.setOnKeyPressed(e -> handleKeyInput(e.getCode()));
         scene.setOnMouseReleased(e -> handleMouseRelease());
         scene.setOnMouseDragged(e -> handleMouseDrag(e));
+
         return scene;
     }
+
+    private void layoutBricks () {
+
+    }
+
+    private void setupSplashScreen() {
+
+    }
+
+    private void displaySplashScreen () {
+
+    }
+
 
     // Change properties of shapes in small ways to animate them over time
     // Note, there are more sophisticated ways to animate shapes, but these simple ways work fine to start
     private void step (double elapsedTime) {
-
         if (start) {
-            ball1.setBallPosition(elapsedTime);
+            long gameTime = System.currentTimeMillis() - startTime;
+            int numberOfBallsToUpdate = (int) Math.ceil(gameTime / BALL_DELAY_MILLIS);
+            if (numberOfBallsToUpdate > NUMBER_OF_BALLS) numberOfBallsToUpdate = NUMBER_OF_BALLS;
+            for (int i = 0; i<numberOfBallsToUpdate; i++ ) {
+                myBalls[i].setBallPosition(elapsedTime);
+            }
+//            ball1.setBallPosition(elapsedTime);
         }
-        if (paddle.getBoundsInParent().intersects(ball1.myBall.getBoundsInParent())){
-            System.out.println("intersection");
+        numberOfBallsInPlay = NUMBER_OF_BALLS;
+        for (Ball b: myBalls){
+            handleIntersection(b);
+            for (Brick brick: myBricks) {
+                handleIntersection(b, brick);
+            }
+            if (!b.isInPlay()) numberOfBallsInPlay--;
         }
-        handleIntersection(ball1);
-
+        if (numberOfBallsInPlay == 0){
+            start = false;
+            for (Ball b: myBalls) {
+                b.setInPlay(true);
+            }
+        }
     }
 
     // Use the ballPointer to calculate the angle the balls should move
@@ -135,18 +156,42 @@ public class Main extends Application {
 
     // Handle ball intersection with brick
     private void handleIntersection(Ball ball, Brick brick){
+        if (ball.getBall().getBoundsInParent().intersects(brick.getBrick().getBoundsInParent())) {
+            brick.reduceStrength();
+            //ball.setBallAngle(-(ball.getBallAngle() + Math.PI));
 
+            // Check if the ball hit the top or bottom of thr brick
+            Shape intersection = Path.intersect(ball.getBall(), brick.getBrick());
+//            System.out.println(Math.round(intersection.boundsInParentProperty().get().getCenterY()));
+//            System.out.println(brick.getBrick().getY());
+//            System.out.println();
+//            System.out.println(intersection.boundsInParentProperty().get().getCenterY() - 15 > brick.getBrick().getY() + brick.getBrick().getHeight());
+            if ((intersection.boundsInParentProperty().get().getCenterY()) + 2 >= brick.getBrick().getY() && (intersection.boundsInParentProperty().get().getCenterY()) - 2 >= brick.getBrick().getY()){
+                System.out.println(intersection.boundsInParentProperty().get().getCenterY());
+                ball.setBallDirectionY(-ball.getBallDirectionY());
+            } else if ((intersection.boundsInParentProperty().get().getCenterY()) <= brick.getBrick().getY() + brick.getBrick().getHeight()){
+                System.out.println(intersection.boundsInParentProperty().get().getCenterY());
+                ball.setBallDirectionY(-ball.getBallDirectionY());
+            } else {
+                ball.setBallAngle(-(ball.getBallAngle() + Math.PI));
+            }
+        }
     }
 
     // Handle ball intersection with wall
     private void handleIntersection(Ball ball){
-        if (ball.myBall.getCenterX() - ball.myBall.getRadius() <= 0 || ball.myBall.getCenterX() + ball.myBall.getRadius() >= myScene.getWidth()) {
+        if (ball.getBall().getCenterX() - ball.getBall().getRadius() <= 0 || ball.getBall().getCenterX() + ball.getBall().getRadius() >= myScene.getWidth()) {
             ball.setBallAngle(-(ball.getBallAngle() + Math.PI));
         }
-        if (ball.myBall.getCenterY() - ball.myBall.getRadius() <= 0) {
+        if (ball.getBall().getCenterY() - ball.getBall().getRadius() <= STATUS_HEIGHT) {
             ball.setBallDirectionY(-1);
         }
-        if (paddle.getBoundsInParent().intersects(ball.myBall.getBoundsInParent())){
+        if (ball.getBall().getCenterY() + ball.getBall().getRadius() >= myScene.getHeight()) {
+            ball.setBallDirectionY(0);
+            ball.setBallDirectionX(0);
+            ball.setInPlay(false);
+        }
+        if (paddle.getBoundsInParent().intersects(ball.getBall().getBoundsInParent())){
             ball.setBallDirectionY(1);
         }
     }
@@ -154,17 +199,24 @@ public class Main extends Application {
     // What to do each time a key is pressed
     private void handleKeyInput (KeyCode code) {
         if (code == KeyCode.RIGHT) {
-            paddle.setX(paddle.getX() + MOVER_SPEED);
-            if (!start) {
-                ballPointer.setStartX(paddle.getBoundsInLocal().getCenterX());
-                ball1.setBallPosition(paddle.getBoundsInLocal().getCenterX(), paddle.getBoundsInLocal().getCenterY() - (paddle.getBoundsInLocal().getHeight()) - ball1.myBall.getRadius());
-            }
+            movePaddle(1);
         }
         else if (code == KeyCode.LEFT) {
-            paddle.setX(paddle.getX() - MOVER_SPEED);
-            if (!start) {
-                ballPointer.setStartX(paddle.getBoundsInLocal().getCenterX());
-                ball1.setBallPosition(paddle.getBoundsInLocal().getCenterX(), paddle.getBoundsInLocal().getCenterY() - (paddle.getBoundsInLocal().getHeight()) - ball1.myBall.getRadius());
+            movePaddle(-1);
+        }
+    }
+
+    private void movePaddle (int direction) {
+        if (paddle.getX() + paddle.getBoundsInLocal().getWidth() < myScene.getWidth() && direction == 1) {
+            paddle.setX(paddle.getX() + direction * MOVER_SPEED);
+        }
+        if (paddle.getX() > 0 && direction == -1){
+            paddle.setX(paddle.getX() + direction * MOVER_SPEED);
+        }
+        if (!start) {
+            ballPointer.setStartX(paddle.getBoundsInLocal().getCenterX());
+            for (Ball b: myBalls){
+                b.setBallPosition(paddle.getBoundsInLocal().getCenterX(), paddle.getBoundsInLocal().getCenterY() - (paddle.getBoundsInLocal().getHeight()) - myBalls[0].getBall().getRadius());
             }
         }
     }
@@ -175,14 +227,23 @@ public class Main extends Application {
             ballPointer.setVisible(true);
             ballPointer.setEndX(e.getX());
             ballPointer.setEndY(e.getY());
+            for (Ball b: myBalls){
+                b.setBallPosition(paddle.getBoundsInLocal().getCenterX(), paddle.getBoundsInLocal().getCenterY() - (paddle.getBoundsInLocal().getHeight()) - myBalls[0].getBall().getRadius());
+            }
         }
     }
 
     private void handleMouseRelease () {
         ballPointer.setVisible(false);
-        ball1.setAngleAndDirection(1, 1, calculateInitialBallAngle());
+        double ballAngle = calculateInitialBallAngle();
+        for (Ball b: myBalls){
+            b.setAngleAndDirection(1, 1, ballAngle);
+        }
+        numberOfBallsInPlay = NUMBER_OF_BALLS;
         start = true;
+        startTime = System.currentTimeMillis();
     }
+
 
     /**
      * Start the program.
