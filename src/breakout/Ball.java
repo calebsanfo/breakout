@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 public class Ball {
-    private static final int SPEED = 300;
+    private static final int SPEED = 400;
     private static final int SIZE = 5;
     private static final Paint BALL_COLOR = Color.GRAY;
     private double ballDirectionX = 1;

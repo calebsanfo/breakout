@@ -14,10 +14,14 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.*;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.sql.Time;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -33,8 +37,8 @@ public class Main extends Application {
     public static final Paint BACKGROUND = Color.AZURE;
     public static final Paint STATUS_BACKGROUND = Color.LIGHTBLUE;
     public static final int MOVER_SPEED = 15;
-    public static final int NUMBER_OF_BALLS = 1;
-    public static final int NUMBER_OF_BRICKS = 6;
+    public static final int NUMBER_OF_BALLS = 20;
+    public static final int NUMBER_OF_BRICKS = 64;
     public static final int BALL_DELAY_MILLIS = 150;
     public static final int INITIAL_LIVES = 3;
 
@@ -47,7 +51,14 @@ public class Main extends Application {
     private Brick[] myBricks= new Brick[NUMBER_OF_BRICKS];
     private long startTime;
     private int numberOfBallsInPlay;
-    private int level;
+    private int numberOfBricksInPlay;
+    private int level = 1;
+    private boolean splashScreen = true;
+    private Status myStatus;
+    private Text splashText;
+    private boolean gameOver = false;
+    private boolean reset = false;
+    private Group myRoot;
 
     private String gameStage = "SPLASH";
 
@@ -62,7 +73,9 @@ public class Main extends Application {
         stage.setTitle(TITLE);
         stage.show();
         // attach "game loop" to timeline to play it (basically just calling step() method repeatedly forever)
-        KeyFrame frame = new KeyFrame(Duration.millis(MILLISECOND_DELAY), e -> step(SECOND_DELAY));
+        KeyFrame frame = new KeyFrame(Duration.millis(MILLISECOND_DELAY), e -> {
+            step(SECOND_DELAY);
+        });
         Timeline animation = new Timeline();
         animation.setCycleCount(Timeline.INDEFINITE);
         animation.getKeyFrames().add(frame);
@@ -72,54 +85,81 @@ public class Main extends Application {
     // Create the game's "scene": what shapes will be in the game and their starting properties
     private Scene setupGame (int width, int height, Paint background) {
         // create one top level collection to organize the things in the scene
-        Group root = new Group();
-        // make some shapes and set their properties
+        myRoot = new Group();
 
-        Image paddleImage = new Image(this.getClass().getClassLoader().getResourceAsStream(("paddle.gif")));
-        paddle = new ImageView(paddleImage);
+        setupSplashScreen(myRoot);
+        createPaddle();
+        layoutBricks();
+        createBalls();
 
-        paddle.setX(width / 2);
-        paddle.setY(height - 30);
-
-        for (int i = 0; i<NUMBER_OF_BRICKS; i++ ) {
-            myBricks[i] = new Brick(root, 50*i, 100, 50, 10, "NORMAL");
-        }
-
-        Status myStatus = new Status(root, INITIAL_LIVES, STATUS_HEIGHT, WINDOW_WIDTH, STATUS_BACKGROUND);
-
-        for (int i = 0; i<NUMBER_OF_BALLS; i++ ) {
-            myBalls[i] = (new Ball(i*2, 0, paddle.getBoundsInLocal().getCenterX(),paddle.getBoundsInLocal().getCenterY()-(paddle.getBoundsInLocal().getHeight())-5));
-            root.getChildren().add(myBalls[i].getBall());
-        }
+        myStatus = new Status(myRoot, INITIAL_LIVES, STATUS_HEIGHT, WINDOW_WIDTH, STATUS_BACKGROUND);
 
         ballPointer = new Line(paddle.getBoundsInLocal().getCenterX(), paddle.getBoundsInLocal().getCenterY()-paddle.getBoundsInLocal().getHeight()-myBalls[0].getBall().getRadius(), 100, 100);
         ballPointer.setVisible(false);
 
-        root.getChildren().add(paddle);
-        root.getChildren().add(ballPointer);
+        for (Brick b: myBricks) if (b != null) b.setVisible(false);
 
+        myRoot.getChildren().add(ballPointer);
+
+        return getScene(width, height, background);
+    }
+
+    private Scene getScene (int width, int height, Paint background) {
         // create a place to see the shapes
-        Scene scene = new Scene(root, width, height, background);
+        Scene scene = new Scene(myRoot, width, height, background);
         // respond to input
         scene.setOnKeyPressed(e -> handleKeyInput(e.getCode()));
         scene.setOnMouseReleased(e -> handleMouseRelease());
         scene.setOnMouseDragged(e -> handleMouseDrag(e));
-
         return scene;
     }
 
+    private void createBalls() {
+        for (int i = 0; i<NUMBER_OF_BALLS; i++ ) {
+            myBalls[i] = (new Ball(i*2, 0, paddle.getBoundsInLocal().getCenterX(),paddle.getBoundsInLocal().getCenterY()-(paddle.getBoundsInLocal().getHeight())-5));
+            myRoot.getChildren().add(myBalls[i].getBall());
+            myBalls[i].getBall().setVisible(false);
+        }
+    }
+
+    private void createPaddle() {
+        Image paddleImage = new Image(this.getClass().getClassLoader().getResourceAsStream(("paddle.gif")));
+        paddle = new ImageView(paddleImage);
+        paddle.setX(WINDOW_WIDTH / 2 - paddle.getBoundsInParent().getWidth()/2);
+        paddle.setY(WINDOW_HEIGHT - 30);
+        myRoot.getChildren().add(paddle);
+        paddle.setVisible(false);
+    }
+
     private void layoutBricks () {
-
+        for (Brick b: myBricks) if (b != null) b.setVisible(false);
+        File file = new File(getClass().getClassLoader().getResource("level"+level+".txt").getFile());
+        Scanner sc = null;
+        try {
+            sc = new Scanner(file);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        int ctr =0, i=0, j=0;
+        while (sc.hasNextLine()) {
+            String[] line = sc.nextLine().split(" ");
+            for (String l: line){
+                myBricks[ctr] = new Brick(myRoot, 50*j, 100+(50*i), 50, Integer.parseInt(l) , "NORMAL");
+                if (Integer.parseInt(l) == 0) myBricks[ctr].setVisible(false);
+                ctr++; j++;
+            }
+            i++; j=0;
+        }
     }
 
-    private void setupSplashScreen() {
-
+    private void setupSplashScreen(Group root) {
+        splashScreen = true;
+        splashText = new Text("Click and drag to aim \nballs. Keep balls in play \nby returning them with\nthe paddle. Pass all 10\nlevels to win \n\n\nClick anywhere to\ncontinue");
+        splashText.setX(20);
+        splashText.setY(100);
+        splashText.setFont(Font.font("Verdana", 30));
+        root.getChildren().add(splashText);
     }
-
-    private void displaySplashScreen () {
-
-    }
-
 
     // Change properties of shapes in small ways to animate them over time
     // Note, there are more sophisticated ways to animate shapes, but these simple ways work fine to start
@@ -131,22 +171,62 @@ public class Main extends Application {
             for (int i = 0; i<numberOfBallsToUpdate; i++ ) {
                 myBalls[i].setBallPosition(elapsedTime);
             }
-//            ball1.setBallPosition(elapsedTime);
         }
+        updateBalls();
+        advanceLevel();
+        checkGameStage();
+    }
+
+    private void updateBalls() {
         numberOfBallsInPlay = NUMBER_OF_BALLS;
         for (Ball b: myBalls){
             handleIntersection(b);
+            numberOfBricksInPlay = 0;
             for (Brick brick: myBricks) {
-                handleIntersection(b, brick);
+                if (brick != null) {
+                    if (brick.getInPlay()) numberOfBricksInPlay++;
+                    handleIntersection(b, brick);
+                }
             }
             if (!b.isInPlay()) numberOfBallsInPlay--;
         }
-        if (numberOfBallsInPlay == 0){
+    }
+
+    private void advanceLevel() {
+        if (numberOfBricksInPlay == 0 && !splashScreen && start==true) {
+            // Advance level
+            level++;
+            myStatus.setLivesLeft(INITIAL_LIVES);
+            layoutBricks();
+            numberOfBallsInPlay =0;
+        }
+    }
+
+    private void checkGameStage() {
+        if (numberOfBallsInPlay == 0 || reset){
             start = false;
             for (Ball b: myBalls) {
+                b.setBallPosition(paddle.getBoundsInLocal().getCenterX(), paddle.getBoundsInLocal().getCenterY() - (paddle.getBoundsInLocal().getHeight()) - myBalls[0].getBall().getRadius());
                 b.setInPlay(true);
             }
+            if (myStatus.getLivesLeft() == 0) {
+                endGame();
+            }
+            if (reset) {
+                reset = false;
+                myStatus.setLivesLeft(myStatus.getLivesLeft()+1);
+            }
         }
+    }
+
+    private void endGame () {
+        gameOver = true;
+        for (Brick b: myBricks) if(b != null) b.setVisible(false);
+        Text endText = new Text("GAME OVER");
+        endText.setFont(Font.font("Verdana", 40));
+        endText.setX(WINDOW_WIDTH/2 - endText.getBoundsInLocal().getWidth()/2);
+        endText.setY(WINDOW_HEIGHT/2 - endText.getBoundsInLocal().getHeight()/2);
+        myRoot.getChildren().add(endText);
     }
 
     // Use the ballPointer to calculate the angle the balls should move
@@ -156,21 +236,15 @@ public class Main extends Application {
 
     // Handle ball intersection with brick
     private void handleIntersection(Ball ball, Brick brick){
-        if (ball.getBall().getBoundsInParent().intersects(brick.getBrick().getBoundsInParent())) {
+        if (ball.getBall().getBoundsInParent().intersects(brick.getBrick().getBoundsInParent()) && brick.getBrick().isVisible()) {
             brick.reduceStrength();
-            //ball.setBallAngle(-(ball.getBallAngle() + Math.PI));
+            myStatus.setScore(myStatus.getScore()+1);
 
             // Check if the ball hit the top or bottom of thr brick
             Shape intersection = Path.intersect(ball.getBall(), brick.getBrick());
-//            System.out.println(Math.round(intersection.boundsInParentProperty().get().getCenterY()));
-//            System.out.println(brick.getBrick().getY());
-//            System.out.println();
-//            System.out.println(intersection.boundsInParentProperty().get().getCenterY() - 15 > brick.getBrick().getY() + brick.getBrick().getHeight());
-            if ((intersection.boundsInParentProperty().get().getCenterY()) + 2 >= brick.getBrick().getY() && (intersection.boundsInParentProperty().get().getCenterY()) - 2 >= brick.getBrick().getY()){
-                System.out.println(intersection.boundsInParentProperty().get().getCenterY());
+            if ((intersection.boundsInParentProperty().get().getCenterY()) + 2 >= brick.getBrick().getY() && (intersection.boundsInParentProperty().get().getCenterY()) - 2 <= brick.getBrick().getY()){
                 ball.setBallDirectionY(-ball.getBallDirectionY());
-            } else if ((intersection.boundsInParentProperty().get().getCenterY()) <= brick.getBrick().getY() + brick.getBrick().getHeight()){
-                System.out.println(intersection.boundsInParentProperty().get().getCenterY());
+            } else if ((intersection.boundsInParentProperty().get().getCenterY()) +2 >= brick.getBrick().getY() + brick.getBrick().getHeight() && (intersection.boundsInParentProperty().get().getCenterY()) -2 <= brick.getBrick().getY() + brick.getBrick().getHeight()){
                 ball.setBallDirectionY(-ball.getBallDirectionY());
             } else {
                 ball.setBallAngle(-(ball.getBallAngle() + Math.PI));
@@ -204,6 +278,45 @@ public class Main extends Application {
         else if (code == KeyCode.LEFT) {
             movePaddle(-1);
         }
+        else if (code == KeyCode.L) {
+            myStatus.setLivesLeft(myStatus.getLivesLeft() + 1);
+        }
+        else if (code == KeyCode.R) {
+            reset = true;
+        }
+        else if (code == KeyCode.DIGIT1) {
+            changeLevel(1);
+        }
+        else if (code == KeyCode.DIGIT2) {
+            changeLevel(2);
+        }
+        else if (code == KeyCode.DIGIT3) {
+            changeLevel(3);
+        }
+        else if (code == KeyCode.DIGIT4) {
+            changeLevel(4);
+        }
+        else if (code == KeyCode.DIGIT5) {
+            changeLevel(5);
+        }
+        else if (code == KeyCode.DIGIT6) {
+            changeLevel(6);
+        }
+        else if (code == KeyCode.DIGIT7) {
+            changeLevel(7);
+        }
+        else if (code == KeyCode.DIGIT8) {
+            changeLevel(8);
+        }
+        else if (code == KeyCode.DIGIT9) {
+            changeLevel(9);
+        }
+    }
+
+    private void changeLevel (int l) {
+        level = l;
+        reset = true;
+        layoutBricks();
     }
 
     private void movePaddle (int direction) {
@@ -223,7 +336,7 @@ public class Main extends Application {
 
     // Change the ballPointer angle when the mouse is dragged
     private void handleMouseDrag (MouseEvent e) {
-        if (!start) {
+        if (!start && !gameOver) {
             ballPointer.setVisible(true);
             ballPointer.setEndX(e.getX());
             ballPointer.setEndY(e.getY());
@@ -234,14 +347,25 @@ public class Main extends Application {
     }
 
     private void handleMouseRelease () {
-        ballPointer.setVisible(false);
-        double ballAngle = calculateInitialBallAngle();
-        for (Ball b: myBalls){
-            b.setAngleAndDirection(1, 1, ballAngle);
+        if (splashScreen) {
+            paddle.setVisible(true);
+            for (Ball b: myBalls) b.getBall().setVisible(true);
+            for (Brick b: myBricks) if (b != null && b.getStrength() != 0) b.setVisible(true);
+            splashText.setVisible(false);
+            splashScreen = false;
+            return;
         }
-        numberOfBallsInPlay = NUMBER_OF_BALLS;
-        start = true;
-        startTime = System.currentTimeMillis();
+        if (!gameOver) {
+            ballPointer.setVisible(false);
+            double ballAngle = calculateInitialBallAngle();
+            for (Ball b : myBalls) {
+                b.setAngleAndDirection(1, 1, ballAngle);
+            }
+            myStatus.setLivesLeft(myStatus.getLivesLeft() - 1);
+            numberOfBallsInPlay = NUMBER_OF_BALLS;
+            start = true;
+            startTime = System.currentTimeMillis();
+        }
     }
 
 
