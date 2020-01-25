@@ -214,7 +214,7 @@ public class Main extends Application {
             }
             if (reset) {
                 reset = false;
-                myStatus.setLivesLeft(myStatus.getLivesLeft()+1);
+                myStatus.addLife();
             }
         }
     }
@@ -279,7 +279,7 @@ public class Main extends Application {
             movePaddle(-1);
         }
         else if (code == KeyCode.L) {
-            myStatus.setLivesLeft(myStatus.getLivesLeft() + 1);
+            myStatus.addLife();
         }
         else if (code == KeyCode.R) {
             reset = true;
@@ -361,7 +361,7 @@ public class Main extends Application {
             for (Ball b : myBalls) {
                 b.setAngleAndDirection(1, 1, ballAngle);
             }
-            myStatus.setLivesLeft(myStatus.getLivesLeft() - 1);
+            myStatus.subtractLife();
             numberOfBallsInPlay = NUMBER_OF_BALLS;
             start = true;
             startTime = System.currentTimeMillis();
